@@ -148,4 +148,29 @@ git commit -m "Implement slide 6 validation"
 git push
 \end{lstlisting}
 Do not commit passwords, database credentials, or generated dependency folders. Keep commits small enough that the professor can follow the architecture.
+
+\section{Slides 10-12: update, delete, soft delete, restore}
+This part was added by Zak on the branch \code{zak}, created from \code{eya}. Its responsibility is to change or remove an existing Todo by its ID. Everything is in \code{src/todos/todos.controller.ts}. It follows the same approach as \code{addTodo}: the controller uses the injected \code{DataSource} and calls \code{getRepository(TodoEntity)}. There is still no \code{TodosService} or \code{TodosModule} (slide 9), so when slide 9 is done the bodies of these four methods can move into the service.
+
+\subsection{Routes}
+\begin{itemize}
+\item Slide 10, \code{PATCH /todos/:id}, method \code{updateTodo}: calls \code{repository.update(Number(id), updateTodoDto)}. Only the fields sent in the body change, and the DTO validation still applies (a name such as \code{ab} returns 400).
+\item Slide 11, \code{DELETE /todos/:id}, method \code{deleteTodo}: calls \code{repository.delete}, which removes the row for good.
+\item Slide 12, \code{DELETE /todos/:id/soft}, method \code{softDeleteTodo}: calls \code{repository.softDelete}, which only fills \code{deletedAt} (the \code{@DeleteDateColumn} of \code{TimestampEntity}). The row stays in the table.
+\item Slide 12, \code{PATCH /todos/:id/restore}, method \code{restoreTodo}: calls \code{repository.restore}, which sets \code{deletedAt} back to null.
+\end{itemize}
+The ID arrives from the URL as text, so \code{Number(id)} converts it before it is passed to TypeORM.
+
+
+\subsection{Verification}
+Tested in PowerShell with \code{Invoke-RestMethod} while \code{npm run start:dev} was running: creating a Todo with \code{POST /v2/todos}, updating its status, updating its name, soft delete, restore and hard delete all returned their success message. Updating with the name \code{ab} was rejected with a 400 and the custom validation message.
+\begin{lstlisting}[language={}]
+Invoke-RestMethod -Method Patch -Uri http://localhost:3000/todos/1 -ContentType "application/json" -Body '{"status":"IN_PROGRESS"}'
+Invoke-RestMethod -Method Delete -Uri http://localhost:3000/todos/1/soft
+Invoke-RestMethod -Method Patch -Uri http://localhost:3000/todos/1/restore
+Invoke-RestMethod -Method Delete -Uri http://localhost:3000/todos/1
+\end{lstlisting}
+\note{Known limitation: this is the minimal version with no existence check. If the ID does not exist, the methods change nothing but still return the success message. Slide 10 asks to handle a missing Todo, so this is still to do: for example call \code{findOne} first and throw \code{NotFoundException}.}
+
+
 \end{document}

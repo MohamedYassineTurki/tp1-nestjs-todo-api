@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Param,
   Patch,
   Post,
@@ -41,15 +42,36 @@ export class TodosController {
     
   }  
 
-  @Patch(':id')
-  update(
+@Patch(':id')
+  async updateTodo(
     @Param('id') id: string,
     @Body() updateTodoDto: UpdateTodoDto,
   ) {
-    return {
-      message: 'Mise à jour valide !',
-      id,
-      data: updateTodoDto,
-    };
+    const repository = this.dataSource.getRepository(TodoEntity);
+    await repository.update(Number(id), updateTodoDto);
+    return { message: 'Todo mis à jour !', id };
   }
+  
+  @Patch(':id/restore')
+  async restoreTodo(@Param('id') id: string) {
+    const repository = this.dataSource.getRepository(TodoEntity);
+    await repository.restore(Number(id));
+    return { message: 'Todo restauré !', id };
+  }
+
+  @Delete(':id/soft')
+  async softDeleteTodo(@Param('id') id: string) {
+    const repository = this.dataSource.getRepository(TodoEntity);
+    await repository.softDelete(Number(id));
+    return { message: 'Todo supprimé (soft delete) !', id };
+  }
+
+
+  @Delete(':id')
+  async deleteTodo(@Param('id') id: string) {
+    const repository = this.dataSource.getRepository(TodoEntity);
+    await repository.delete(Number(id));
+    return { message: 'Todo supprimé définitivement !', id };
+  }
+  
 }
