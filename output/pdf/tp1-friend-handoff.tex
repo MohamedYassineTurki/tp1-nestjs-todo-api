@@ -1,0 +1,151 @@
+\input{tp1-handoff-style.tex}
+\hypersetup{pdftitle={TP1 NestJS Handoff},pdfauthor={Yassine}}
+\thispagestyle{empty}
+{\small\bfseries\color{teal} NESTJS / RT4 TP1 / HANDOFF FOR THE NEXT DEVELOPER}\par\vspace{10mm}
+{\fontsize{31}{35}\selectfont\bfseries TP1 Continuation Notes\par}\vspace{4mm}
+{\Large Pull the repository, verify the baseline, continue from slide 6\par}
+\vspace{5mm}{\color{muted} Project: \code{todo-api} \textbullet\ Current boundary: TypeORM configured}\par\vspace{8mm}
+This handoff records exactly what is implemented and gives a safe continuation path. Do not start by rewriting the existing architecture. Run the baseline checks first, then extend it feature by feature.
+\note{The repository is intentionally stopped before validation and Todo CRUD. Your first task is slide 6: DTO constraints and validation.}
+
+\section{Clone and verify}
+After the repository is published, clone it with:
+\begin{lstlisting}[language={}]
+git clone https://github.com/MohamedYassineTurki/tp1-nestjs-todo-api.git
+cd tp1-nestjs-todo-api
+npm install
+npm run build
+\end{lstlisting}
+Start development mode:
+\begin{lstlisting}[language={}]
+npm run start:dev
+\end{lstlisting}
+In another terminal, verify the completed endpoint:
+\begin{lstlisting}[language={}]
+curl http://localhost:3000/uuid-test
+\end{lstlisting}
+Expected response:
+\begin{lstlisting}[language={}]
+{"id":"a-generated-uuid"}
+\end{lstlisting}
+Repeat the request. The value should change.
+
+\section{Current structure}
+\begin{lstlisting}[language={}]
+src/
+  main.ts                         Application startup
+  app.module.ts                   Root module and TypeORM connection
+  app.controller.ts               Initial Hello World route
+  app.service.ts                  Initial service
+  common/
+    common.module.ts              Global shared module
+    constants/common.constants.ts UUID provider token
+  uuid-test/
+    uuid-test.module.ts           Test feature module
+    uuid-test.controller.ts       GET /uuid-test
+    uuid-test.service.ts          Injects and calls UUID provider
+  todos/
+    entities/todo.entity.ts       TypeORM Todo entity
+    enums/status.enum.ts          Temporary three-value status enum
+todo.sqlite                       Local development database
+\end{lstlisting}
+The project currently has no Todo controller or Todo service. The entity exists, but no Todo repository is injected yet.
+
+\section{Completed work}
+\subsection{Nest application}
+\code{src/main.ts} bootstraps \code{AppModule} and listens on port 3000. \code{AppModule} registers the root controller, root service, common module, UUID test module, and TypeORM connection.
+
+\subsection{UUID provider}
+\code{CommonModule} imports \code{v4 as uuidv4} from \code{uuid}, registers it with \code{useValue}, and exports the symbol token \code{UUID\_PROVIDER}. The global decorator makes the shared provider available to feature modules.
+\begin{lstlisting}
+{
+  provide: UUID_PROVIDER,
+  useValue: uuidv4,
+}
+\end{lstlisting}
+\code{UuidTestService} receives the function with \code{@Inject(UUID\_PROVIDER)}. Its controller exposes \code{GET /uuid-test}.
+
+\subsection{Entity and database}
+\code{TodoEntity} contains an auto-generated integer ID, name, description, creation timestamp, and status. \code{AppModule} configures TypeORM with \code{better-sqlite3}, the file \code{todo.sqlite}, and \code{synchronize: true} for local learning.
+The earlier configuration \code{type: 'sqlite'} failed with the installed TypeORM definitions. The working driver name is \code{better-sqlite3}; both the package and the configuration are already present.
+
+\section{Your first continuation: slide 6}
+Install validation packages:
+\begin{lstlisting}[language={}]
+npm install class-validator class-transformer
+\end{lstlisting}
+Add the global validation pipe in \code{src/main.ts}:
+\begin{lstlisting}
+import { ValidationPipe } from '@nestjs/common';
+
+app.useGlobalPipes(
+  new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true,
+  }),
+);
+\end{lstlisting}
+Create \code{src/todos/dto/create-todo.dto.ts}. The assignment requires a required description of at least 10 characters and a required name between 3 and 10 characters:
+\begin{lstlisting}
+import { IsString, Length, MinLength } from 'class-validator';
+
+export class CreateTodoDto {
+  @IsString()
+  @Length(3, 10)
+  name!: string;
+
+  @IsString()
+  @MinLength(10)
+  description!: string;
+}
+\end{lstlisting}
+Create a separate update DTO with optional fields, retaining the size constraints. Add status validation with \code{IsEnum(StatusEnum)}. Put all custom error messages in one reusable constants file.
+
+\section{Remaining TP sequence}
+Follow this order so each step has a working foundation:
+\begin{enumerate}
+\item Slide 6: validation pipe, create DTO, update DTO, reusable messages, enum validation.
+\item Slide 7: add \code{updatedAt} and \code{deletedAt}; keep \code{createdAt} controlled by TypeORM and excluded from update input.
+\item Slide 8: extract creation, update, and deletion timestamp columns into a reusable base entity.
+\item Slide 9: generate \code{TodosModule}, \code{TodosService}, and \code{TodosController};\\ import \code{TypeOrmModule.forFeature([TodoEntity])}; implement \code{addTodo} and preserve both requested versions.
+\item Slide 10: implement update by ID and handle a missing Todo.
+\item Slides 11-12: implement hard delete, soft delete, and restore.
+\item Slide 13: add one aggregation endpoint returning counts for the three statuses.
+\item Slides 14-15: get all Todos and get one Todo by ID with \code{NotFoundException}.
+\item Slide 16: add optional search and status filters with the intended \code{(name OR description) AND status} logic.
+\item Slide 17: add validated page and limit parameters, stable ordering, skip, take, and useful pagination metadata.
+\end{enumerate}
+
+\section{Recommended Todo wiring}
+When you create the feature module, the repository registration belongs in that module:
+\begin{lstlisting}
+@Module({
+  imports: [TypeOrmModule.forFeature([TodoEntity])],
+  controllers: [TodosController],
+  providers: [TodosService],
+})
+export class TodosModule {}
+\end{lstlisting}
+The service then receives the repository:
+\begin{lstlisting}
+constructor(
+  @InjectRepository(TodoEntity)
+  private readonly todoRepository: Repository<TodoEntity>,
+) {}
+\end{lstlisting}
+Keep HTTP extraction in the controller and database/application logic in the service.
+
+\section{Baseline issues to know}
+The application build passes and the UUID endpoint works. The CLI-generated unit tests for \code{UuidTestService} and \code{UuidTestController} currently fail because their isolated test modules do not provide the UUID token and service dependency. Before final delivery, update those tests with mocks or imported modules. Do not mistake a unit-test dependency error for a runtime application error.
+The local file \code{todo.sqlite} should not be committed. Add it to \code{.gitignore}; the database can be recreated from the entity and TypeORM configuration. Also ignore \code{node\_modules}, \code{dist}, and \code{coverage}.
+
+\section{Git workflow}
+After each coherent TP milestone:
+\begin{lstlisting}[language={}]
+git status
+git add src package.json package-lock.json .gitignore
+git commit -m "Implement slide 6 validation"
+git push
+\end{lstlisting}
+Do not commit passwords, database credentials, or generated dependency folders. Keep commits small enough that the professor can follow the architecture.
+\end{document}

@@ -1,0 +1,47 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[margin=18mm,top=20mm,bottom=19mm,headheight=14pt]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric}
+\usepackage{listings}
+\usepackage{tabularx,booktabs,array}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\definecolor{ink}{HTML}{142D40}
+\definecolor{teal}{HTML}{007F82}
+\definecolor{muted}{HTML}{536575}
+\definecolor{pale}{HTML}{F0F6F8}
+\definecolor{rulegray}{HTML}{D6E1E7}
+\definecolor{red}{HTML}{B9424A}
+\hypersetup{colorlinks=true,linkcolor=teal,urlcolor=teal}
+\renewcommand{\familydefault}{\sfdefault}
+\color{ink}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt}
+\setlength{\emergencystretch}{2em}
+\renewcommand{\arraystretch}{1.2}
+\setlist[itemize]{leftmargin=16pt,itemsep=2pt,topsep=2pt}
+\setlist[enumerate]{leftmargin=18pt,itemsep=2pt,topsep=2pt}
+\titleformat{\section}{\Large\bfseries\color{ink}}{\textcolor{teal}{\thesection\enspace}}{0pt}{}
+\titleformat{\subsection}{\normalsize\bfseries\color{teal}}{}{0pt}{}
+\titlespacing*{\section}{0pt}{9pt}{7pt}
+\titlespacing*{\subsection}{0pt}{7pt}{3pt}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textcolor{muted}{NESTJS TP1}}
+\fancyhead[R]{\small\textcolor{muted}{Study documentation}}
+\fancyfoot[L]{\footnotesize\textcolor{muted}{Explain the responsibility, then the code.}}
+\fancyfoot[R]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\lstdefinelanguage{TypeScript}{keywords={import,from,export,class,const,let,return,new,private,readonly,constructor,async,await,if,throw,extends,string,number,boolean,void,true,false,enum},sensitive=true,comment=[l]{//},morecomment=[s]{/*}{*/},morestring=[b]',morestring=[b]"}
+\lstset{language=TypeScript,basicstyle=\ttfamily\footnotesize,keywordstyle=\color{teal}\bfseries,commentstyle=\color{muted},stringstyle=\color{red},backgroundcolor=\color{pale},frame=single,rulecolor=\color{rulegray},framerule=0.4pt,framesep=6pt,xleftmargin=6pt,xrightmargin=6pt,breaklines=true,columns=fullflexible,keepspaces=true,showstringspaces=false,tabsize=2,aboveskip=7pt,belowskip=6pt}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\note}[1]{\par\smallskip\noindent\colorbox{pale}{\parbox{\dimexpr\linewidth-12pt}{\vspace{4pt}\textcolor{teal}{\textbf{Remember}} \ #1\vspace{4pt}}}\par\smallskip}
+\tikzset{box/.style={draw=rulegray,fill=pale,rounded corners=3pt,align=center,minimum height=11mm,text width=38mm,font=\small},accent/.style={box,draw=teal,fill=teal!7},arr/.style={-{Latex[length=2mm]},thick,draw=teal}}
+\begin{document}
+
