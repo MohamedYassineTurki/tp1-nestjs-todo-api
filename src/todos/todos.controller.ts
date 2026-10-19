@@ -4,6 +4,7 @@ import {
   Param,
   Patch,
   Post,
+  Version,
 } from '@nestjs/common';
 
 import { DataSource } from 'typeorm';
@@ -18,14 +19,27 @@ export class TodosController {
   constructor(private readonly dataSource: DataSource) {}
 
   @Post()
+  @Version('1')
   create(@Body() createTodoDto: CreateTodoDto) {
-    return {
-      message: 'Todo valide !',
-      data: createTodoDto,
-    };
+  return {
+    message: 'Todo valide !',
+    data: createTodoDto,
+  };
   }
 
-  
+  @Post()
+  @Version('2')
+  async addTodo(@Body() createTodoDto: CreateTodoDto){
+    const repository = this.dataSource.getRepository(TodoEntity);
+    const todo = repository.create(createTodoDto);
+    const savedTodo = await repository.save(todo);
+
+    return {
+      message: 'Todo ajouté avec succès !',
+      data: savedTodo,
+    };
+    
+  }  
 
   @Patch(':id')
   update(
