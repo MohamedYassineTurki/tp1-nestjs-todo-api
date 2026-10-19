@@ -1,15 +1,13 @@
 import {
   Column,
-  CreateDateColumn,
   Entity,
   PrimaryGeneratedColumn,
-  UpdateDateColumn,
-  DeleteDateColumn
 } from 'typeorm';
 import { StatusEnum } from '../enums/status.enum';
+import { TimestampEntity } from './timestamp.entity';
 
 @Entity('todos')
-export class TodoEntity {
+export class TodoEntity extends TimestampEntity{
   @PrimaryGeneratedColumn()
  
   id!: number;
@@ -20,17 +18,10 @@ export class TodoEntity {
   @Column()
   description!: string;
 
-  @CreateDateColumn({update : false })
-  createdAt!: Date;
-
   @Column({
     type: 'varchar',
     default: StatusEnum.TODO,
   })
-  status!: StatusEnum;
-  @UpdateDateColumn()
-  updatedAt!:Date ; 
 
-  @DeleteDateColumn()
-  deletedAt!: Date | null;
+  status!:StatusEnum;
 }
