@@ -1,14 +1,15 @@
 import {
   Column,
-  CreateDateColumn,
   Entity,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { StatusEnum } from '../enums/status.enum';
+import { TimestampEntity } from './timestamp.entity';
 
 @Entity('todos')
-export class TodoEntity {
+export class TodoEntity extends TimestampEntity{
   @PrimaryGeneratedColumn()
+ 
   id!: number;
 
   @Column()
@@ -17,12 +18,10 @@ export class TodoEntity {
   @Column()
   description!: string;
 
-  @CreateDateColumn()
-  createdAt!: Date;
-
   @Column({
     type: 'varchar',
     default: StatusEnum.TODO,
   })
-  status!: StatusEnum;
+
+  status!:StatusEnum;
 }
