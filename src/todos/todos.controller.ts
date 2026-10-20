@@ -4,9 +4,11 @@ import {
   Delete,
   Get, //ki
   Param,
+  NotFoundException,
   Patch,
   Post,
   Version,
+  ParseIntPipe,
 } from '@nestjs/common';
 
 import { DataSource } from 'typeorm';
@@ -101,4 +103,17 @@ export class TodosController {
     return { message: 'Todo supprimé définitivement !', id };
   }
   
+  @Get(':id')
+  async findOne(@Param('id', ParseIntPipe) id: number) {
+  const todo = await this.dataSource
+    .getRepository(TodoEntity)
+    .findOneBy({ id });
+
+  if (!todo) {
+    throw new NotFoundException(`Le Todo avec l'id ${id} n'existe pas !`);
+  }
+
+  return todo;
 }
+}
+
