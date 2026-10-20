@@ -39,7 +39,13 @@ export class TodosController {
     rows.forEach((row) => (stats[row.status] = Number(row.count)));
     return stats;
   }
-
+  
+    // Slide 14 ki
+  @Get()
+  async getAll() {
+    return this.dataSource.getRepository(TodoEntity).find();
+  }
+  
   @Post()
   @Version('1')
   create(@Body() createTodoDto: CreateTodoDto) {
