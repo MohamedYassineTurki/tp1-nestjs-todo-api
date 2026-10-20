@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  Get, //ki
   Param,
   Patch,
   Post,
@@ -10,6 +11,7 @@ import {
 
 import { DataSource } from 'typeorm';
 import { TodoEntity } from './entities/todo.entity';
+import { StatusEnum } from './enums/status.enum'; //ki
 
 import { CreateTodoDto } from './dto/create-todo.dto/create-todo.dto';
 import { UpdateTodoDto } from './dto/update-todo.dto/update-todo.dto';
@@ -18,6 +20,25 @@ import { UpdateTodoDto } from './dto/update-todo.dto/update-todo.dto';
 export class TodosController {
 
   constructor(private readonly dataSource: DataSource) {}
+    // Slide 13 ki
+  @Get('stats')
+  async getStats() {
+    const rows = await this.dataSource
+      .getRepository(TodoEntity)
+      .createQueryBuilder('todo')
+      .select('todo.status', 'status')
+      .addSelect('COUNT(*)', 'count')
+      .groupBy('todo.status')
+      .getRawMany<{ status: StatusEnum; count: string }>();
+
+    const stats = {
+      [StatusEnum.TODO]: 0,
+      [StatusEnum.IN_PROGRESS]: 0,
+      [StatusEnum.DONE]: 0,
+    };
+    rows.forEach((row) => (stats[row.status] = Number(row.count)));
+    return stats;
+  }
 
   @Post()
   @Version('1')
