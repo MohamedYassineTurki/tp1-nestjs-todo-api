@@ -4,17 +4,22 @@ import {
   Delete,
   Get, //ki
   Param,
+  NotFoundException,
   Patch,
   Post,
   Version,
+  ParseIntPipe,
+  Query,
 } from '@nestjs/common';
 
-import { DataSource } from 'typeorm';
+import { Brackets, DataSource } from 'typeorm';
 import { TodoEntity } from './entities/todo.entity';
 import { StatusEnum } from './enums/status.enum'; //ki
 
 import { CreateTodoDto } from './dto/create-todo.dto/create-todo.dto';
 import { UpdateTodoDto } from './dto/update-todo.dto/update-todo.dto';
+import { FilterTodoDto } from './dto/filter-todo.dto/filter-todo-dto';
+import { PaginationDto } from './dto/pagination.dto/pagination.dto';
 
 @Controller('todos')
 export class TodosController {
@@ -40,11 +45,45 @@ export class TodosController {
     return stats;
   }
   
-    // Slide 14 ki
   @Get()
-  async getAll() {
-    return this.dataSource.getRepository(TodoEntity).find();
+  async getAll(@Query() { page, limit }: PaginationDto) {
+    const [data, total] = await this.dataSource
+      .getRepository(TodoEntity)
+      .findAndCount({
+        order: { id: 'ASC' },
+        skip: (page - 1) * limit,
+        take: limit,
+      });
+
+    return {
+      data,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
   }
+  
+  @Get()
+  async findAll(@Query() filterDto: FilterTodoDto) {
+  const { search, status } = filterDto;
+
+  const qb = this.dataSource
+    .getRepository(TodoEntity)
+    .createQueryBuilder('todo');
+
+  if (search) {
+    qb.andWhere(
+      new Brackets((q) => {
+        q.where('todo.name LIKE :search', { search: `%${search}%` })
+          .orWhere('todo.description LIKE :search');
+      }),
+    );
+  }
+
+  if (status) {
+    qb.andWhere('todo.status = :status', { status });
+  }
+
+  return qb.getMany();
+}
   
   @Post()
   @Version('1')
@@ -69,7 +108,7 @@ export class TodosController {
     
   }  
 
-@Patch(':id')
+  @Patch(':id')
   async updateTodo(
     @Param('id') id: string,
     @Body() updateTodoDto: UpdateTodoDto,
@@ -101,4 +140,17 @@ export class TodosController {
     return { message: 'Todo supprimé définitivement !', id };
   }
   
+  @Get(':id')
+  async findOne(@Param('id', ParseIntPipe) id: number) {
+  const todo = await this.dataSource
+    .getRepository(TodoEntity)
+    .findOneBy({ id });
+
+  if (!todo) {
+    throw new NotFoundException(`Le Todo avec l'id ${id} n'existe pas !`);
+  }
+
+  return todo;
 }
+}
+
