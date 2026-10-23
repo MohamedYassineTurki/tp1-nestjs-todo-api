@@ -61,7 +61,7 @@ export class TodosController {
     };
   }
   
-  @Get()
+  @Get('search')
   async findAll(@Query() filterDto: FilterTodoDto) {
   const { search, status } = filterDto;
 
