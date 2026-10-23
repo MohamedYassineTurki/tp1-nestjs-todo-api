@@ -6,16 +6,11 @@ import {
   Post,
 } from '@nestjs/common';
 
-import { DataSource } from 'typeorm';
-import { TodoEntity } from './entities/todo.entity';
-
 import { CreateTodoDto } from './dto/create-todo.dto/create-todo.dto';
 import { UpdateTodoDto } from './dto/update-todo.dto/update-todo.dto';
 
 @Controller('todos')
 export class TodosController {
-
-  constructor(private readonly dataSource: DataSource) {}
 
   @Post()
   create(@Body() createTodoDto: CreateTodoDto) {
@@ -24,8 +19,6 @@ export class TodosController {
       data: createTodoDto,
     };
   }
-
-  
 
   @Patch(':id')
   update(
