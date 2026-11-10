@@ -4,7 +4,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { StatusEnum } from '../enums/status.enum';
-import { TimestampEntity } from './timestamp.entity';
+import { TimestampEntity } from '../../common/entities/timestamp.entity';
 
 @Entity('todos')
 export class TodoEntity extends TimestampEntity{
@@ -24,4 +24,8 @@ export class TodoEntity extends TimestampEntity{
   })
 
   status!:StatusEnum;
+
+  // Créateur du todo. Nullable : les todos créés avant le TP2 n'en ont pas.
+  @Column({ type: 'integer', nullable: true })
+  userId!: number | null;
 }

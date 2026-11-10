@@ -1,0 +1,313 @@
+# Tests manuels — extension "REST Client" de VS Code (cliquer sur "Send Request").
+# Les tokens dépendent du JWT_SECRET de votre .env et expirent après 7 jours :
+# pour les régénérer, lancer `npm run tokens` et coller la sortie ci-dessous.
+# Pour rejouer les ids (1, 2…) : supprimer todo.sqlite et relancer l'app.
+
+@baseUrl = http://localhost:3000
+@tokenUser1 = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImlhdCI6MTc5NDMzNDIwNSwiZXhwIjoxNzk0OTM5MDA1fQ.OhQTaBSVmpv9R4riJvqWrQx8pw-8wTJdHPFuubut2j4
+@tokenUser2 = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImlhdCI6MTc5NDMzNDIwNSwiZXhwIjoxNzk0OTM5MDA1fQ.c1I5J4NI69V6JAfW4TGTXRJS2_k3taUEAHC8NdfHGGw
+@tokenSansUserId = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFub255bWUiLCJpYXQiOjE3OTQzMzQyMDUsImV4cCI6MTc5NDkzOTAwNX0.RgEw_ACr6vHH9NJOmjbfonXqKfF0HBmtuZQPqHK9Bdo
+@tokenMauvaisSecret = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImlhdCI6MTc5NDMzNDIwNSwiZXhwIjoxNzk0OTM5MDA1fQ.r0BjjGnu0hJPZNkzK0kwHmAMSJEv1P4WB4DY3ZSrZlc
+
+###############################################################################
+# PARTIE 1 — AuthMiddleware (401)
+###############################################################################
+
+### Route hors TodosController : pas de token exigé -> 200
+GET {{baseUrl}}/
+
+### Sans header auth-user -> 401
+GET {{baseUrl}}/todos
+
+### Token mal formé -> 401
+GET {{baseUrl}}/todos
+auth-user: pas.un.token
+
+### Token signé avec un autre secret (verify échoue) -> 401
+GET {{baseUrl}}/todos
+auth-user: {{tokenMauvaisSecret}}
+
+### Token valide mais sans userId -> 401
+GET {{baseUrl}}/todos
+auth-user: {{tokenSansUserId}}
+
+###############################################################################
+# PARTIE 1 — Ajout avec userId
+###############################################################################
+
+### v1 : validation seule (rien n'est enregistré) -> 201
+POST {{baseUrl}}/v1/todos
+auth-user: {{tokenUser1}}
+Content-Type: application/json
+
+{ "name": "abc", "description": "description ok" }
+
+### v2 : user 1 crée le todo 1 -> 201, data.userId = 1
+POST {{baseUrl}}/v2/todos
+auth-user: {{tokenUser1}}
+Content-Type: application/json
+
+{ "name": "todo-u1", "description": "appartient au user 1" }
+
+### v2 : user 2 crée le todo 2 -> 201, data.userId = 2
+POST {{baseUrl}}/v2/todos
+auth-user: {{tokenUser2}}
+Content-Type: application/json
+
+{ "name": "todo-u2", "description": "appartient au user 2" }
+
+### DTO invalide -> 400
+POST {{baseUrl}}/v2/todos
+auth-user: {{tokenUser1}}
+Content-Type: application/json
+
+{ "name": "x", "description": "court" }
+
+### Lecture (token exigé car tout le controller est protégé) -> 200
+GET {{baseUrl}}/todos
+auth-user: {{tokenUser1}}
+
+###############################################################################
+# PARTIE 1 — Update / delete réservés au créateur (403 / 404)
+###############################################################################
+
+### user 1 modifie son todo -> 200
+PATCH {{baseUrl}}/todos/1
+auth-user: {{tokenUser1}}
+Content-Type: application/json
+
+{ "status": "DONE" }
+
+### user 2 modifie le todo du user 1 -> 403
+PATCH {{baseUrl}}/todos/1
+auth-user: {{tokenUser2}}
+Content-Type: application/json
+
+{ "status": "IN_PROGRESS" }
+
+### todo inexistant -> 404
+PATCH {{baseUrl}}/todos/999
+auth-user: {{tokenUser1}}
+Content-Type: application/json
+
+{ "status": "DONE" }
+
+### user 2 supprime le todo du user 1 -> 403
+DELETE {{baseUrl}}/todos/1
+auth-user: {{tokenUser2}}
+
+### user 2 soft-delete le todo du user 1 -> 403
+DELETE {{baseUrl}}/todos/1/soft
+auth-user: {{tokenUser2}}
+
+### user 1 soft-delete son todo -> 200
+DELETE {{baseUrl}}/todos/1/soft
+auth-user: {{tokenUser1}}
+
+### user 2 restaure le todo du user 1 -> 403
+PATCH {{baseUrl}}/todos/1/restore
+auth-user: {{tokenUser2}}
+
+### user 1 restaure son todo -> 200
+PATCH {{baseUrl}}/todos/1/restore
+auth-user: {{tokenUser1}}
+
+### suppression d'un todo inexistant -> 404
+DELETE {{baseUrl}}/todos/999
+auth-user: {{tokenUser1}}
+
+### user 1 supprime définitivement son todo -> 200
+DELETE {{baseUrl}}/todos/1
+auth-user: {{tokenUser1}}
+
+### le todo 1 n'existe plus -> 404
+GET {{baseUrl}}/todos/1
+auth-user: {{tokenUser1}}
+
+###############################################################################
+# PARTIE 2 — User (pas de middleware : auth-user inutile)
+# Le champ password ne doit apparaître dans AUCUNE réponse.
+###############################################################################
+
+### Créer alice (user 1) -> 201, sans password dans la réponse
+POST {{baseUrl}}/user
+Content-Type: application/json
+
+{ "username": "alice", "email": "alice@insat.tn", "password": "secret123" }
+
+### Créer bob (user 2) -> 201
+POST {{baseUrl}}/user
+Content-Type: application/json
+
+{ "username": "bob", "email": "bob@insat.tn", "password": "secret456" }
+
+### DTO invalide (email, password trop court) -> 400
+POST {{baseUrl}}/user
+Content-Type: application/json
+
+{ "username": "", "email": "pas-un-email", "password": "123" }
+
+### Propriété inconnue (forbidNonWhitelisted) -> 400
+POST {{baseUrl}}/user
+Content-Type: application/json
+
+{ "username": "eve", "email": "eve@insat.tn", "password": "secret789", "role": "admin" }
+
+### Liste des users -> 200, sans password
+GET {{baseUrl}}/user
+
+### User inexistant -> 404
+GET {{baseUrl}}/user/999
+
+### Id non numérique (ParseIntPipe) -> 400
+GET {{baseUrl}}/user/abc
+
+### Modifier le password de bob -> 200, password toujours absent
+PATCH {{baseUrl}}/user/2
+Content-Type: application/json
+
+{ "password": "nouveau123" }
+
+### Modifier un user inexistant -> 404
+PATCH {{baseUrl}}/user/999
+Content-Type: application/json
+
+{ "username": "fantome" }
+
+###############################################################################
+# PARTIE 2 — Skill
+###############################################################################
+
+### Créer le skill 1 -> 201
+POST {{baseUrl}}/skill
+Content-Type: application/json
+
+{ "designation": "NestJS" }
+
+### Créer le skill 2 -> 201
+POST {{baseUrl}}/skill
+Content-Type: application/json
+
+{ "designation": "TypeORM" }
+
+### Créer le skill 3 -> 201
+POST {{baseUrl}}/skill
+Content-Type: application/json
+
+{ "designation": "Angulr" }
+
+### DTO invalide (designation manquante) -> 400
+POST {{baseUrl}}/skill
+Content-Type: application/json
+
+{}
+
+### Corriger le skill 3 -> 200
+PATCH {{baseUrl}}/skill/3
+Content-Type: application/json
+
+{ "designation": "Angular" }
+
+### Skill inexistant -> 404
+GET {{baseUrl}}/skill/999
+
+###############################################################################
+# PARTIE 2 — Cv (relations User et Skill)
+###############################################################################
+
+### Cv 1 d'alice avec NestJS + TypeORM -> 201, user et skills chargés, sans password
+POST {{baseUrl}}/cv
+Content-Type: application/json
+
+{ "name": "Ben Salah", "firstname": "Alice", "age": 22, "cin": "01234567", "job": "Développeuse", "userId": 1, "skillIds": [1, 2] }
+
+### Cv 2 de bob avec Angular -> 201
+POST {{baseUrl}}/cv
+Content-Type: application/json
+
+{ "name": "Trabelsi", "firstname": "Bob", "age": 24, "cin": "07654321", "job": "Front-end", "path": "cvs/bob.pdf", "userId": 2, "skillIds": [3] }
+
+### Cv 3 sans user ni skills -> 201, user null et skills []
+POST {{baseUrl}}/cv
+Content-Type: application/json
+
+{ "name": "Anonyme", "firstname": "Sans", "age": 30, "cin": "11112222", "job": "Testeur" }
+
+### DTO invalide (age négatif, cin de 2 chiffres, skillIds non entiers) -> 400
+POST {{baseUrl}}/cv
+Content-Type: application/json
+
+{ "name": "X", "firstname": "Y", "age": -1, "cin": "12", "job": "Z", "skillIds": ["a"] }
+
+### userId inexistant -> 404
+POST {{baseUrl}}/cv
+Content-Type: application/json
+
+{ "name": "X", "firstname": "Y", "age": 20, "cin": "12345678", "job": "Z", "userId": 999 }
+
+### Un des skillIds inexistant -> 404 (liste les ids manquants)
+POST {{baseUrl}}/cv
+Content-Type: application/json
+
+{ "name": "X", "firstname": "Y", "age": 20, "cin": "12345678", "job": "Z", "skillIds": [1, 999] }
+
+### Liste des cvs -> 200, chaque cv avec son user (sans password) et ses skills
+GET {{baseUrl}}/cv
+
+### Cv inexistant -> 404
+GET {{baseUrl}}/cv/999
+
+### Modifier seulement le job -> 200, skills inchangés (NestJS + TypeORM)
+PATCH {{baseUrl}}/cv/1
+Content-Type: application/json
+
+{ "job": "Lead dev" }
+
+### Remplacer les skills du cv 1 par Angular -> 200
+PATCH {{baseUrl}}/cv/1
+Content-Type: application/json
+
+{ "skillIds": [3] }
+
+### Transférer le cv 1 à bob -> 200, user = bob
+PATCH {{baseUrl}}/cv/1
+Content-Type: application/json
+
+{ "userId": 2 }
+
+### Modifier avec un skill inexistant -> 404
+PATCH {{baseUrl}}/cv/1
+Content-Type: application/json
+
+{ "skillIds": [999] }
+
+### Modifier un cv inexistant -> 404
+PATCH {{baseUrl}}/cv/999
+Content-Type: application/json
+
+{ "job": "rien" }
+
+###############################################################################
+# PARTIE 2 — Suppressions (table de jointure et onDelete CASCADE)
+###############################################################################
+
+### Supprimer le skill Angular -> 200
+DELETE {{baseUrl}}/skill/3
+
+### Le cv 1 n'a plus Angular : la ligne de jointure a été supprimée -> skills []
+GET {{baseUrl}}/cv/1
+
+### Supprimer bob -> 200 ; onDelete CASCADE supprime ses cvs (1 et 2)
+DELETE {{baseUrl}}/user/2
+
+### Il ne reste que le cv 3
+GET {{baseUrl}}/cv
+
+### Supprimer un cv inexistant -> 404
+DELETE {{baseUrl}}/cv/999
+
+### Supprimer le cv 3 -> 200
+DELETE {{baseUrl}}/cv/3
+
+### bob n'existe plus -> 404
+GET {{baseUrl}}/user/2

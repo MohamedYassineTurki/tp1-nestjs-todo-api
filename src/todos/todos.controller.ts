@@ -2,20 +2,20 @@ import {
   Body,
   Controller,
   Delete,
-  Get, //ki
+  Get,
   Param,
-  NotFoundException,
   Patch,
   Post,
   Version,
   ParseIntPipe,
   Query,
+  Req,
 } from '@nestjs/common';
 
-import { Brackets, DataSource } from 'typeorm';
-import { TodoEntity } from './entities/todo.entity';
-import { StatusEnum } from './enums/status.enum'; //ki
-
+// "import type" : une interface n'existe pas à l'exécution, elle ne peut donc
+// pas servir de métadonnée de décorateur (exigé par isolatedModules).
+import type { AuthRequest } from '../common/interfaces/auth-request.interface';
+import { TodosService } from './todos.service';
 import { CreateTodoDto } from './dto/create-todo.dto/create-todo.dto';
 import { UpdateTodoDto } from './dto/update-todo.dto/update-todo.dto';
 import { FilterTodoDto } from './dto/filter-todo.dto/filter-todo-dto';
@@ -23,134 +23,75 @@ import { PaginationDto } from './dto/pagination.dto/pagination.dto';
 
 @Controller('todos')
 export class TodosController {
+  constructor(private readonly todosService: TodosService) {}
 
-  constructor(private readonly dataSource: DataSource) {}
-    // Slide 13 ki
+  // Les routes fixes (stats, search) sont déclarées avant ':id'
+  // pour ne pas être capturées par la route paramétrée.
   @Get('stats')
-  async getStats() {
-    const rows = await this.dataSource
-      .getRepository(TodoEntity)
-      .createQueryBuilder('todo')
-      .select('todo.status', 'status')
-      .addSelect('COUNT(*)', 'count')
-      .groupBy('todo.status')
-      .getRawMany<{ status: StatusEnum; count: string }>();
-
-    const stats = {
-      [StatusEnum.TODO]: 0,
-      [StatusEnum.IN_PROGRESS]: 0,
-      [StatusEnum.DONE]: 0,
-    };
-    rows.forEach((row) => (stats[row.status] = Number(row.count)));
-    return stats;
+  getStats() {
+    return this.todosService.getStats();
   }
-  
+
   @Get()
-  async getAll(@Query() { page, limit }: PaginationDto) {
-    const [data, total] = await this.dataSource
-      .getRepository(TodoEntity)
-      .findAndCount({
-        order: { id: 'ASC' },
-        skip: (page - 1) * limit,
-        take: limit,
-      });
-
-    return {
-      data,
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
-    };
+  getAll(@Query() paginationDto: PaginationDto) {
+    return this.todosService.findAllPaginated(paginationDto);
   }
-  
+
   @Get('search')
-  async findAll(@Query() filterDto: FilterTodoDto) {
-  const { search, status } = filterDto;
-
-  const qb = this.dataSource
-    .getRepository(TodoEntity)
-    .createQueryBuilder('todo');
-
-  if (search) {
-    qb.andWhere(
-      new Brackets((q) => {
-        q.where('todo.name LIKE :search', { search: `%${search}%` })
-          .orWhere('todo.description LIKE :search');
-      }),
-    );
+  findAll(@Query() filterDto: FilterTodoDto) {
+    return this.todosService.search(filterDto);
   }
 
-  if (status) {
-    qb.andWhere('todo.status = :status', { status });
-  }
-
-  return qb.getMany();
-}
-  
   @Post()
   @Version('1')
   create(@Body() createTodoDto: CreateTodoDto) {
-  return {
-    message: 'Todo valide !',
-    data: createTodoDto,
-  };
+    return {
+      message: 'Todo valide !',
+      data: createTodoDto,
+    };
   }
 
+  // req.userId a été injecté par AuthMiddleware avant d'arriver ici.
   @Post()
   @Version('2')
-  async addTodo(@Body() createTodoDto: CreateTodoDto){
-    const repository = this.dataSource.getRepository(TodoEntity);
-    const todo = repository.create(createTodoDto);
-    const savedTodo = await repository.save(todo);
-
+  async addTodo(@Body() createTodoDto: CreateTodoDto, @Req() req: AuthRequest) {
+    const savedTodo = await this.todosService.create(createTodoDto, req.userId);
     return {
       message: 'Todo ajouté avec succès !',
       data: savedTodo,
     };
-    
-  }  
+  }
 
   @Patch(':id')
   async updateTodo(
     @Param('id') id: string,
     @Body() updateTodoDto: UpdateTodoDto,
+    @Req() req: AuthRequest,
   ) {
-    const repository = this.dataSource.getRepository(TodoEntity);
-    await repository.update(Number(id), updateTodoDto);
+    await this.todosService.update(Number(id), updateTodoDto, req.userId);
     return { message: 'Todo mis à jour !', id };
   }
-  
+
   @Patch(':id/restore')
-  async restoreTodo(@Param('id') id: string) {
-    const repository = this.dataSource.getRepository(TodoEntity);
-    await repository.restore(Number(id));
+  async restoreTodo(@Param('id') id: string, @Req() req: AuthRequest) {
+    await this.todosService.restore(Number(id), req.userId);
     return { message: 'Todo restauré !', id };
   }
 
   @Delete(':id/soft')
-  async softDeleteTodo(@Param('id') id: string) {
-    const repository = this.dataSource.getRepository(TodoEntity);
-    await repository.softDelete(Number(id));
+  async softDeleteTodo(@Param('id') id: string, @Req() req: AuthRequest) {
+    await this.todosService.softDelete(Number(id), req.userId);
     return { message: 'Todo supprimé (soft delete) !', id };
   }
 
-
   @Delete(':id')
-  async deleteTodo(@Param('id') id: string) {
-    const repository = this.dataSource.getRepository(TodoEntity);
-    await repository.delete(Number(id));
+  async deleteTodo(@Param('id') id: string, @Req() req: AuthRequest) {
+    await this.todosService.remove(Number(id), req.userId);
     return { message: 'Todo supprimé définitivement !', id };
   }
-  
+
   @Get(':id')
-  async findOne(@Param('id', ParseIntPipe) id: number) {
-  const todo = await this.dataSource
-    .getRepository(TodoEntity)
-    .findOneBy({ id });
-
-  if (!todo) {
-    throw new NotFoundException(`Le Todo avec l'id ${id} n'existe pas !`);
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.todosService.findOne(id);
   }
-
-  return todo;
 }
-}
-
