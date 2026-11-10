@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, Repository } from 'typeorm';
 
@@ -67,32 +71,52 @@ export class TodosService {
     return qb.getMany();
   }
 
-  async findOne(id: number) {
-    const todo = await this.todoRepository.findOneBy({ id });
+  // withDeleted : inclure les todos soft-deleted (nécessaire pour restore).
+  async findOne(id: number, withDeleted = false) {
+    const todo = await this.todoRepository.findOne({
+      where: { id },
+      withDeleted,
+    });
     if (!todo) {
       throw new NotFoundException(`Le Todo avec l'id ${id} n'existe pas !`);
     }
     return todo;
   }
 
-  create(createTodoDto: CreateTodoDto) {
-    const todo = this.todoRepository.create(createTodoDto);
+  create(createTodoDto: CreateTodoDto, userId: number) {
+    const todo = this.todoRepository.create({ ...createTodoDto, userId });
     return this.todoRepository.save(todo);
   }
 
-  update(id: number, updateTodoDto: UpdateTodoDto) {
+  async update(id: number, updateTodoDto: UpdateTodoDto, userId: number) {
+    await this.checkOwnership(id, userId);
     return this.todoRepository.update(id, updateTodoDto);
   }
 
-  restore(id: number) {
+  async restore(id: number, userId: number) {
+    await this.checkOwnership(id, userId, true);
     return this.todoRepository.restore(id);
   }
 
-  softDelete(id: number) {
+  async softDelete(id: number, userId: number) {
+    await this.checkOwnership(id, userId);
     return this.todoRepository.softDelete(id);
   }
 
-  remove(id: number) {
+  async remove(id: number, userId: number) {
+    await this.checkOwnership(id, userId);
     return this.todoRepository.delete(id);
+  }
+
+  // 404 si le todo n'existe pas, 403 si le user n'en est pas le créateur.
+  private async checkOwnership(
+    id: number,
+    userId: number,
+    withDeleted = false,
+  ) {
+    const todo = await this.findOne(id, withDeleted);
+    if (todo.userId !== userId) {
+      throw new ForbiddenException("Vous n'êtes pas le créateur de ce Todo");
+    }
   }
 }

@@ -24,4 +24,8 @@ export class TodoEntity extends TimestampEntity{
   })
 
   status!:StatusEnum;
+
+  // Créateur du todo. Nullable : les todos créés avant le TP2 n'en ont pas.
+  @Column({ type: 'integer', nullable: true })
+  userId!: number | null;
 }

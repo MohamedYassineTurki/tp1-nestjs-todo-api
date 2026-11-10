@@ -9,8 +9,12 @@ import {
   Version,
   ParseIntPipe,
   Query,
+  Req,
 } from '@nestjs/common';
 
+// "import type" : une interface n'existe pas à l'exécution, elle ne peut donc
+// pas servir de métadonnée de décorateur (exigé par isolatedModules).
+import type { AuthRequest } from '../common/interfaces/auth-request.interface';
 import { TodosService } from './todos.service';
 import { CreateTodoDto } from './dto/create-todo.dto/create-todo.dto';
 import { UpdateTodoDto } from './dto/update-todo.dto/update-todo.dto';
@@ -47,10 +51,11 @@ export class TodosController {
     };
   }
 
+  // req.userId a été injecté par AuthMiddleware avant d'arriver ici.
   @Post()
   @Version('2')
-  async addTodo(@Body() createTodoDto: CreateTodoDto) {
-    const savedTodo = await this.todosService.create(createTodoDto);
+  async addTodo(@Body() createTodoDto: CreateTodoDto, @Req() req: AuthRequest) {
+    const savedTodo = await this.todosService.create(createTodoDto, req.userId);
     return {
       message: 'Todo ajouté avec succès !',
       data: savedTodo,
@@ -61,26 +66,27 @@ export class TodosController {
   async updateTodo(
     @Param('id') id: string,
     @Body() updateTodoDto: UpdateTodoDto,
+    @Req() req: AuthRequest,
   ) {
-    await this.todosService.update(Number(id), updateTodoDto);
+    await this.todosService.update(Number(id), updateTodoDto, req.userId);
     return { message: 'Todo mis à jour !', id };
   }
 
   @Patch(':id/restore')
-  async restoreTodo(@Param('id') id: string) {
-    await this.todosService.restore(Number(id));
+  async restoreTodo(@Param('id') id: string, @Req() req: AuthRequest) {
+    await this.todosService.restore(Number(id), req.userId);
     return { message: 'Todo restauré !', id };
   }
 
   @Delete(':id/soft')
-  async softDeleteTodo(@Param('id') id: string) {
-    await this.todosService.softDelete(Number(id));
+  async softDeleteTodo(@Param('id') id: string, @Req() req: AuthRequest) {
+    await this.todosService.softDelete(Number(id), req.userId);
     return { message: 'Todo supprimé (soft delete) !', id };
   }
 
   @Delete(':id')
-  async deleteTodo(@Param('id') id: string) {
-    await this.todosService.remove(Number(id));
+  async deleteTodo(@Param('id') id: string, @Req() req: AuthRequest) {
+    await this.todosService.remove(Number(id), req.userId);
     return { message: 'Todo supprimé définitivement !', id };
   }
 
