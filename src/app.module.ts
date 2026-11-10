@@ -5,7 +5,7 @@ import { AppService } from './app.service';
 import { CommonModule } from './common/common.module';
 import { UuidTestModule } from './uuid-test/uuid-test.module';
 import { TodoEntity } from './todos/entities/todo.entity';
-import { TodosController } from './todos/todos.controller';
+import { TodosModule } from './todos/todos.module';
 
 @Module({
   imports: [
@@ -17,8 +17,9 @@ import { TodosController } from './todos/todos.controller';
     }),
     CommonModule,
     UuidTestModule,
+    TodosModule,
   ],
-  controllers: [AppController, TodosController],
+  controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule {}
