@@ -60,7 +60,7 @@ Résultats obtenus sur une base neuve (56 requêtes) : 18 × 200, 11 × 201, 6 �
 | Fichier | Rôle |
 |---|---|
 | `user/entities/user.entity.ts` | `id`, `username`, `email`, `password` (`select: false`), `@OneToMany cvs` |
-| `skill/entities/skill.entity.ts` | `id`, `designation` |
+| `skill/entities/skill.entity.ts` | `id`, `designation`, `@ManyToMany cvs` (côté inverse, sans eager) |
 | `cv/entities/cv.entity.ts` | `id`, `name`, `firstname`, `age`, `cin`, `job`, `path` (nullable), `@ManyToOne user`, `@ManyToMany skills` + `@JoinTable` |
 | `*/dto/create-*.dto.ts` | Validation avec `class-validator` |
 | `*/dto/update-*.dto.ts` | `PartialType(Create…Dto)` : mêmes règles, tous les champs optionnels |
@@ -245,10 +245,13 @@ User 1 ───── * Cv * ───── * Skill
 
 **Cv * ─── * Skill**
 
-- Côté Cv : `@ManyToMany(() => Skill, { eager: true })` + `@JoinTable()`.
+- Côté Cv (propriétaire) : `@ManyToMany(() => Skill, (skill) => skill.cvs, { eager: true })` + `@JoinTable()`.
+- Côté Skill (inverse) : `@ManyToMany(() => Cv, (cv) => cv.skills)`, **sans** `@JoinTable` et **sans** `eager`.
+- La relation est **bidirectionnelle** : chaque côté déclare la relation, et le deuxième argument (`(cv) => cv.skills`, `(skill) => skill.cvs`) indique à TypeORM que les deux déclarations décrivent **la même** relation. Il n'y a donc qu'une table de jointure.
 - Une relation N-N ne peut pas se stocker avec une simple clé étrangère. Il faut une **table de jointure** : `cvs_skills_skills (cvsId, skillsId)`.
 - `@JoinTable()` se met sur **un seul côté**, le côté **propriétaire**. C'est lui qui crée la table et qui l'écrit quand on fait `save` d'un Cv.
-- La relation est **unidirectionnelle** : `Skill` ne déclare pas `cvs`, puisqu'on n'a pas besoin de lister les cvs d'un skill. On pourrait l'ajouter (`@ManyToMany(() => Cv, (cv) => cv.skills)`) sans `@JoinTable`.
+- **Pas de boucle de chargement.** Seul `Cv.skills` est eager. Un `GET /cv` charge les skills de chaque cv, mais pas les cvs de ces skills. Un `GET /skill` ne charge aucun cv. Ça a été vérifié : aucune réponse de `requests.http` ne contient de clé `cvs`, et les 56 réponses sont identiques à celles de la version unidirectionnelle.
+- **Intérêt du côté inverse :** on peut, quand on en a besoin, charger les cvs d'un skill avec `find({ relations: { cvs: true } })` ou `leftJoinAndSelect('skill.cvs', 'cv')`, sans changer le schéma.
 
 Schéma SQL réellement généré :
 
@@ -271,7 +274,7 @@ CREATE TABLE "cvs_skills_skills" ("cvsId" integer, "skillsId" integer,
 
 À savoir sur ces options :
 
-- **`eager` sur un seul côté.** `User.cvs` n'est pas eager : sinon chaque lecture d'un user chargerait tous ses cvs. Et TypeORM **interdit les relations eager circulaires** (les deux côtés en eager provoquent une erreur).
+- **Relations bidirectionnelles, `eager` sur un seul côté.** Comme le demande le cours, les deux relations qui ont un `eager` sont bidirectionnelles (`Cv.user` ↔ `User.cvs`, `Cv.skills` ↔ `Skill.cvs`), et `eager` n'est mis que du côté Cv. `User.cvs` et `Skill.cvs` ne sont pas eager : sinon chaque lecture d'un user ou d'un skill chargerait tous ses cvs. Et TypeORM **interdit les relations eager circulaires** (les deux côtés en eager provoquent une erreur).
 - **`eager` ne marche qu'avec `find*`.** Avec `createQueryBuilder`, il faut faire `leftJoinAndSelect` soi-même.
 - **La table de jointure a `ON DELETE CASCADE` par défaut.** Supprimer un skill retire seulement les lignes de liaison, pas les cvs. Ça a été testé : après `DELETE /skill/3`, le cv 1 a `skills: []`.
 - **`cascade` et `onDelete` ne se ressemblent que par le nom.** `cascade` est géré par TypeORM, en JavaScript, au moment du `save`. `onDelete` est une règle SQL, appliquée par la base même si on supprime la ligne en SQL pur.
@@ -391,8 +394,12 @@ Il crée la table de jointure `cvs_skills_skills` et désigne le côté proprié
 **Q15. Différence entre `cascade` et `onDelete: 'CASCADE'` ?**
 `cascade` est une option TypeORM : au `save`, il insère ou met à jour aussi les entités liées. `onDelete: 'CASCADE'` est une contrainte SQL sur la clé étrangère : quand la base supprime la ligne référencée, elle supprime les lignes qui la référencent. Ici, il n'y a pas de `cascade`, puisqu'on lie des entités existantes par leurs ids. Il y a `onDelete: 'CASCADE'` sur `Cv.user`.
 
-**Q16. Pourquoi pas `eager` sur `User.cvs` aussi ?**
-TypeORM interdit les relations eager des deux côtés (relation circulaire). Et ce serait coûteux : chaque lecture d'un user chargerait tous ses cvs. Si on en a besoin, on demande `find({ relations: { cvs: true } })` au cas par cas.
+**Q16. Pourquoi pas `eager` sur `User.cvs` (ou `Skill.cvs`) aussi ?**
+TypeORM interdit les relations eager des deux côtés (relation circulaire). Et ce serait coûteux : chaque lecture d'un user ou d'un skill chargerait tous ses cvs. Si on en a besoin, on demande `find({ relations: { cvs: true } })` au cas par cas.
+
+**Q16 bis. Pourquoi la relation Cv ↔ Skill est-elle bidirectionnelle ?**
+Le cours demande une relation bidirectionnelle pour utiliser `eager`. On déclare donc `Skill.cvs` comme côté inverse, sans `@JoinTable` (Cv reste propriétaire) et sans `eager` (pas de boucle). Les fonctions `(cv) => cv.skills` et `(skill) => skill.cvs` relient les deux côtés en une seule relation, avec une seule table de jointure.
+*Nuance si le prof creuse :* techniquement, TypeORM accepte aussi `eager` sur une relation unidirectionnelle. C'était le cas dans une version précédente de ce code, et les skills étaient bien chargés. Passer en bidirectionnel suit la règle du cours, donne accès aux cvs d'un skill si besoin, et ne change aucune réponse de l'API.
 
 **Q17. `eager` fonctionne-t-il avec `createQueryBuilder` ?**
 Non, seulement avec les méthodes `find*`. Avec le QueryBuilder, on écrit soi-même `leftJoinAndSelect('cv.user', 'user')`.

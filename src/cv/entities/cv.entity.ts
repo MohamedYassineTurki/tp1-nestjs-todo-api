@@ -44,12 +44,13 @@ export class Cv extends TimestampEntity {
   })
   user!: User | null;
 
-  // Cv * ─── * Skill : @JoinTable crée la table de jointure cvs_skills_skills
+  // Cv * ─── * Skill (bidirectionnelle, inverse : Skill.cvs) :
+  // @JoinTable crée la table de jointure cvs_skills_skills
   // et indique que Cv est le côté propriétaire de la relation.
   // eager : les skills sont chargés avec chaque cv.
   // Pas de cascade : on lie des skills existants (par leurs ids),
   // on n'en crée/modifie jamais à travers un cv.
-  @ManyToMany(() => Skill, { eager: true })
+  @ManyToMany(() => Skill, (skill) => skill.cvs, { eager: true })
   @JoinTable()
   skills!: Skill[];
 }
