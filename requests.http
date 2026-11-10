@@ -1,0 +1,125 @@
+# Tests manuels — extension "REST Client" de VS Code (cliquer sur "Send Request").
+# Les tokens dépendent du JWT_SECRET de votre .env et expirent après 7 jours :
+# pour les régénérer, lancer `npm run tokens` et coller la sortie ci-dessous.
+# Pour rejouer les ids (1, 2…) : supprimer todo.sqlite et relancer l'app.
+
+@baseUrl = http://localhost:3000
+@tokenUser1 = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImlhdCI6MTc5NDMzNDIwNSwiZXhwIjoxNzk0OTM5MDA1fQ.OhQTaBSVmpv9R4riJvqWrQx8pw-8wTJdHPFuubut2j4
+@tokenUser2 = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImlhdCI6MTc5NDMzNDIwNSwiZXhwIjoxNzk0OTM5MDA1fQ.c1I5J4NI69V6JAfW4TGTXRJS2_k3taUEAHC8NdfHGGw
+@tokenSansUserId = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFub255bWUiLCJpYXQiOjE3OTQzMzQyMDUsImV4cCI6MTc5NDkzOTAwNX0.RgEw_ACr6vHH9NJOmjbfonXqKfF0HBmtuZQPqHK9Bdo
+@tokenMauvaisSecret = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImlhdCI6MTc5NDMzNDIwNSwiZXhwIjoxNzk0OTM5MDA1fQ.r0BjjGnu0hJPZNkzK0kwHmAMSJEv1P4WB4DY3ZSrZlc
+
+###############################################################################
+# PARTIE 1 — AuthMiddleware (401)
+###############################################################################
+
+### Route hors TodosController : pas de token exigé -> 200
+GET {{baseUrl}}/
+
+### Sans header auth-user -> 401
+GET {{baseUrl}}/todos
+
+### Token mal formé -> 401
+GET {{baseUrl}}/todos
+auth-user: pas.un.token
+
+### Token signé avec un autre secret (verify échoue) -> 401
+GET {{baseUrl}}/todos
+auth-user: {{tokenMauvaisSecret}}
+
+### Token valide mais sans userId -> 401
+GET {{baseUrl}}/todos
+auth-user: {{tokenSansUserId}}
+
+###############################################################################
+# PARTIE 1 — Ajout avec userId
+###############################################################################
+
+### v1 : validation seule (rien n'est enregistré) -> 201
+POST {{baseUrl}}/v1/todos
+auth-user: {{tokenUser1}}
+Content-Type: application/json
+
+{ "name": "abc", "description": "description ok" }
+
+### v2 : user 1 crée le todo 1 -> 201, data.userId = 1
+POST {{baseUrl}}/v2/todos
+auth-user: {{tokenUser1}}
+Content-Type: application/json
+
+{ "name": "todo-u1", "description": "appartient au user 1" }
+
+### v2 : user 2 crée le todo 2 -> 201, data.userId = 2
+POST {{baseUrl}}/v2/todos
+auth-user: {{tokenUser2}}
+Content-Type: application/json
+
+{ "name": "todo-u2", "description": "appartient au user 2" }
+
+### DTO invalide -> 400
+POST {{baseUrl}}/v2/todos
+auth-user: {{tokenUser1}}
+Content-Type: application/json
+
+{ "name": "x", "description": "court" }
+
+### Lecture (token exigé car tout le controller est protégé) -> 200
+GET {{baseUrl}}/todos
+auth-user: {{tokenUser1}}
+
+###############################################################################
+# PARTIE 1 — Update / delete réservés au créateur (403 / 404)
+###############################################################################
+
+### user 1 modifie son todo -> 200
+PATCH {{baseUrl}}/todos/1
+auth-user: {{tokenUser1}}
+Content-Type: application/json
+
+{ "status": "DONE" }
+
+### user 2 modifie le todo du user 1 -> 403
+PATCH {{baseUrl}}/todos/1
+auth-user: {{tokenUser2}}
+Content-Type: application/json
+
+{ "status": "IN_PROGRESS" }
+
+### todo inexistant -> 404
+PATCH {{baseUrl}}/todos/999
+auth-user: {{tokenUser1}}
+Content-Type: application/json
+
+{ "status": "DONE" }
+
+### user 2 supprime le todo du user 1 -> 403
+DELETE {{baseUrl}}/todos/1
+auth-user: {{tokenUser2}}
+
+### user 2 soft-delete le todo du user 1 -> 403
+DELETE {{baseUrl}}/todos/1/soft
+auth-user: {{tokenUser2}}
+
+### user 1 soft-delete son todo -> 200
+DELETE {{baseUrl}}/todos/1/soft
+auth-user: {{tokenUser1}}
+
+### user 2 restaure le todo du user 1 -> 403
+PATCH {{baseUrl}}/todos/1/restore
+auth-user: {{tokenUser2}}
+
+### user 1 restaure son todo -> 200
+PATCH {{baseUrl}}/todos/1/restore
+auth-user: {{tokenUser1}}
+
+### suppression d'un todo inexistant -> 404
+DELETE {{baseUrl}}/todos/999
+auth-user: {{tokenUser1}}
+
+### user 1 supprime définitivement son todo -> 200
+DELETE {{baseUrl}}/todos/1
+auth-user: {{tokenUser1}}
+
+### le todo 1 n'existe plus -> 404
+GET {{baseUrl}}/todos/1
+auth-user: {{tokenUser1}}
