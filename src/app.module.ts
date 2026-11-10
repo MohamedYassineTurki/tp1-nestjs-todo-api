@@ -11,6 +11,8 @@ import { TodosModule } from './todos/todos.module';
 import { TodosController } from './todos/todos.controller';
 import { UserModule } from './user/user.module';
 import { User } from './user/entities/user.entity';
+import { SkillModule } from './skill/skill.module';
+import { Skill } from './skill/entities/skill.entity';
 
 @Module({
   imports: [
@@ -19,13 +21,14 @@ import { User } from './user/entities/user.entity';
     TypeOrmModule.forRoot({
       type: 'better-sqlite3',
       database: 'todo.sqlite',
-      entities: [TodoEntity, User],
+      entities: [TodoEntity, User, Skill],
       synchronize: true,
     }),
     CommonModule,
     UuidTestModule,
     TodosModule,
     UserModule,
+    SkillModule,
   ],
   controllers: [AppController],
   providers: [AppService],
