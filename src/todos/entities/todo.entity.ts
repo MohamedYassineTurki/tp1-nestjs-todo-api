@@ -4,7 +4,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { StatusEnum } from '../enums/status.enum';
-import { TimestampEntity } from './timestamp.entity';
+import { TimestampEntity } from '../../common/entities/timestamp.entity';
 
 @Entity('todos')
 export class TodoEntity extends TimestampEntity{
