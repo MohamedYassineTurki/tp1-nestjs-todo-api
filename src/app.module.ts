@@ -13,6 +13,8 @@ import { UserModule } from './user/user.module';
 import { User } from './user/entities/user.entity';
 import { SkillModule } from './skill/skill.module';
 import { Skill } from './skill/entities/skill.entity';
+import { CvModule } from './cv/cv.module';
+import { Cv } from './cv/entities/cv.entity';
 
 @Module({
   imports: [
@@ -21,7 +23,7 @@ import { Skill } from './skill/entities/skill.entity';
     TypeOrmModule.forRoot({
       type: 'better-sqlite3',
       database: 'todo.sqlite',
-      entities: [TodoEntity, User, Skill],
+      entities: [TodoEntity, User, Skill, Cv],
       synchronize: true,
     }),
     CommonModule,
@@ -29,6 +31,7 @@ import { Skill } from './skill/entities/skill.entity';
     TodosModule,
     UserModule,
     SkillModule,
+    CvModule,
   ],
   controllers: [AppController],
   providers: [AppService],
