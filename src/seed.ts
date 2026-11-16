@@ -4,6 +4,7 @@ import { AppModule } from './app.module';
 import { UserService } from './user/user.service';
 import { SkillService } from './skill/skill.service';
 import { CvService } from './cv/cv.service';
+import { AuthService } from './auth/auth.service';
 
 import {
   randEmail,
@@ -25,7 +26,7 @@ function clean(text: string): string {
 }
 
 async function seedUsers(app: INestApplicationContext) {
-  const userService = app.get(UserService);
+  const authService = app.get(AuthService);
   const users = [];
 
   for (let i = 0; i < 5; i++) {
@@ -33,10 +34,10 @@ async function seedUsers(app: INestApplicationContext) {
     const lastname = randLastName();
     const username = `${clean(firstname)}.${clean(lastname)}${i}`;
 
-    const user = await userService.create({
+    const user = await authService.register({
       username,
       email: `${username}@example.com`,
-      password: randPassword(),
+      password: 'Password123!', // connu, pour tester le login
     });
 
     users.push({ user, firstname, lastname });

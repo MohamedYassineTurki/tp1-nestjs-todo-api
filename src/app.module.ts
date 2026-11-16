@@ -1,24 +1,22 @@
-import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { CommonModule } from './common/common.module';
-import { AuthMiddleware } from './common/middlewares/auth.middleware';
 import { UuidTestModule } from './uuid-test/uuid-test.module';
 import { TodoEntity } from './todos/entities/todo.entity';
 import { TodosModule } from './todos/todos.module';
-import { TodosController } from './todos/todos.controller';
 import { UserModule } from './user/user.module';
 import { User } from './user/entities/user.entity';
 import { SkillModule } from './skill/skill.module';
 import { Skill } from './skill/entities/skill.entity';
 import { CvModule } from './cv/cv.module';
 import { Cv } from './cv/entities/cv.entity';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
-    // Charge .env dans process.env et rend ConfigService injectable partout.
     ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRoot({
       type: 'better-sqlite3',
@@ -32,10 +30,13 @@ import { Cv } from './cv/entities/cv.entity';
     UserModule,
     SkillModule,
     CvModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
+export class AppModule {}
+/*
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     // Toutes les routes de TodosController (contrôleur de persistance),
@@ -43,3 +44,4 @@ export class AppModule implements NestModule {
     consumer.apply(AuthMiddleware).forRoutes(TodosController);
   }
 }
+*/
