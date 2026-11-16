@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -18,11 +18,18 @@ import { AuthModule } from './auth/auth.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    TypeOrmModule.forRoot({
-      type: 'better-sqlite3',
-      database: 'todo.sqlite',
-      entities: [TodoEntity, User, Skill, Cv],
-      synchronize: true,
+    TypeOrmModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        type: 'mysql' as const,
+        host: config.getOrThrow<string>('DB_HOST'),
+        port: Number(config.getOrThrow<string>('DB_PORT')),
+        username: config.getOrThrow<string>('DB_USERNAME'),
+        password: config.get<string>('DB_PASSWORD', ''),
+        database: config.getOrThrow<string>('DB_DATABASE'),
+        entities: [TodoEntity, User, Skill, Cv],
+        synchronize: config.get<string>('DB_SYNCHRONIZE', 'true') === 'true',
+      }),
     }),
     CommonModule,
     UuidTestModule,

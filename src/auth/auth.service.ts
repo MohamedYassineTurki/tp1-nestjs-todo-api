@@ -1,3 +1,4 @@
+import { JwtService } from '@nestjs/jwt';
 import {
   ConflictException,
   Injectable,
@@ -10,12 +11,14 @@ import { User } from '../user/entities/user.entity';
 import { Role } from '../user/enums/role.enum';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { Jwt } from 'jsonwebtoken';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    private readonly jwtService : JwtService
   ) {}
 
   async register({ username, email, password }: RegisterDto) {
@@ -39,13 +42,23 @@ export class AuthService {
   }
 
   async login({ username, password }: LoginDto) {
-    const user = await this.userRepository.findOne({ where: { username } });
+     const user = await this.userRepository
+                  .createQueryBuilder('user')
+                  .addSelect('user.password')
+                  .where('user.username = :username', { username })
+                  .getOne();
 
     if (!user || !(await bcrypt.compare(password, user.password))) {
       throw new UnauthorizedException('Identifiants invalides');
     }
+    const payload = {
+      username , 
+      email : user.email , 
+      role : user.role
+    }
+    const jwt = await this.jwtService.sign(payload) ; 
 
-    return { message: 'Connexion réussie', user: this.toSafeUser(user) };
+    return { message: 'Connexion réussie', user: this.toSafeUser(user) , "access-token" : jwt};
   }
 
   // ne jamais renvoyer le hash du mot de passe
